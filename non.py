@@ -12,26 +12,29 @@ class Grass:
         self.image.draw(400,30)
 
 def handle_events():
-    global running
+    global running, boy
     events = get_events()
     for event in events:
         if event.type == SDL_QUIT:
             running = False
         elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
             running = False
+        else:
+            boy.handle_event(event)
 
 def reset_world():
     global running
     global grass
     global team
     global world
+    global boy
 
     running = True
     world = []
     grass = Grass()
     world.append(grass)
-    character = Boy()
-    world.append(character)
+    boy = Boy()
+    world.append(boy)
 #    team = [Boy() for i in range(11)]
 #    world += team
 #    num = random.randint(1,19)
@@ -39,7 +42,6 @@ def reset_world():
 def update_world():
     for o in world:
         o.update()
-    pass
 
 def render_world():
     clear_canvas()
