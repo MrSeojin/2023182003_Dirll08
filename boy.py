@@ -6,10 +6,12 @@ class Idle:
     def enter(boy, e):
         #현재 시간을 저장
         boy.start_time = get_time()
-        if left_up(e) or left_down(e):
+        if left_up(e) or left_down(e) or boy.dir == -1:
             boy.action = 2
-        if right_up(e) or right_down(e):
+            boy.face_dir = -1
+        if right_up(e) or right_down(e) or boy.dir == 1 or start_event(e):
             boy.action = 3
+            boy.face_dir = 1
         print('Boy Idle Enter')
     @staticmethod
     def exit(boy, e):
@@ -36,7 +38,7 @@ class Sleep:
         boy.frame = (boy.frame + 1) % 8
     @staticmethod
     def draw(boy):  #''좌우 상하 반전 x 'v'좌우반전? 'h'상하반전?
-        if boy.dir == -1:
+        if boy.face_dir == -1:
             boy.image.clip_composite_draw(boy.frame * 100, boy.action * 100, 100, 100, -3.141592 / 2, '', boy.x + 25,
                                           boy.y - 25, 100, 100)
         else:
@@ -59,10 +61,43 @@ class Run:
     @staticmethod
     def do(boy):
         boy.x += boy.dir * 5
+        if boy.x > 775:
+            boy.x = 775
+        elif boy.x < 25:
+            boy.x = 25
         boy.frame = (boy.frame + 1) % 8
     @staticmethod
     def draw(boy):  # ''좌우 상하 반전 x 'v'좌우반전? 'h'상하반전?
         boy.image.clip_draw(boy.frame * 100, boy.action * 100, 100, 100, boy.x, boy.y)
+
+class AutoRun:
+    @staticmethod
+    def enter(boy,e):
+        boy.start_time = get_time()
+        print('Boy AutoRun Enter')
+        if left_down(e) or left_up(e) or boy.face_dir == -1:
+            boy.action = 0
+            boy.dir = -1
+        elif right_down(e) or right_up(e) or boy.face_dir == 1:
+            boy.action = 1
+            boy.dir = 1
+        boy.frame = 0
+    @staticmethod
+    def exit(boy, e):
+        print('Boy AutoRun Exit')
+    @staticmethod
+    def do(boy):
+        boy.x += boy.dir * 10
+        if (boy.x > 750 and boy.dir == 1) or (boy.x < 50 and boy.dir == -1):
+            boy.dir *= -1
+            boy.action = (boy.action + 1) % 2
+            boy.x += boy.dir * 10
+        boy.frame = (boy.frame + 1) % 8
+        if get_time() - boy.start_time > 3:
+            boy.state_machine.add_event(('TIME_OUT', 0))
+    @staticmethod
+    def draw(boy):  # ''좌우 상하 반전 x 'v'좌우반전? 'h'상하반전?
+        boy.image.clip_draw(boy.frame * 100, boy.action * 100, 100, 100, boy.x, boy.y + 15, 150, 150)
 
 class Boy:
     def __init__(self):
@@ -75,9 +110,10 @@ class Boy:
         self.state_machine.start(Idle)
         self.state_machine.set_transitions(
             {
-                Idle : { time_out : Sleep, right_down : Run, left_down : Run, right_up : Idle, left_up : Idle },
-                Sleep: { space_down : Idle, right_down : Run, left_down : Run, right_up : Idle, left_up : Idle },
-                Run : { right_down : Run, left_down : Run, right_up : Idle, left_up : Idle }
+                Idle : { time_out : Sleep, right_down : Run, left_down : Run, a_down : AutoRun },
+                Sleep: { space_down : Idle, right_down : Run, left_down : Run, a_down : AutoRun },
+                Run : { right_up : Idle, left_up : Idle, a_down : AutoRun },
+                AutoRun : { time_out : Idle, right_down : Run, left_down : Run }
             }
         )
     def update(self):
