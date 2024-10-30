@@ -4,14 +4,23 @@ from state_machine import*
 class Idle:
     @staticmethod
     def enter(boy, e):
+        if (left_up(e) or right_up(e)) and boy.keep_run == 0:
+            if left_up(e):
+                boy.keep_run = 1
+            else:
+                boy.keep_run = -1
+            boy.state_machine.add_event(('KEEP_RUN', 0))
+        else:
+            boy.keep_run = 0
         #현재 시간을 저장
         boy.start_time = get_time()
-        if left_up(e) or left_down(e) or boy.dir == -1:
+        if left_up(e) or right_down(e) or boy.dir == -1:
             boy.action = 2
             boy.face_dir = -1
-        if right_up(e) or right_down(e) or boy.dir == 1 or start_event(e):
+        if right_up(e) or left_down(e) or boy.dir == 1 or start_event(e):
             boy.action = 3
             boy.face_dir = 1
+        boy.dir = 0
         print('Boy Idle Enter')
     @staticmethod
     def exit(boy, e):
@@ -29,6 +38,7 @@ class Sleep:
     @staticmethod
     def enter(boy, e):
         boy.frame = 3
+        boy.bir = 0
         print('Boy Sleep Enter')
     @staticmethod
     def exit(boy, e):
@@ -48,12 +58,13 @@ class Run:
     @staticmethod
     def enter(boy,e):
         print('Boy Run Enter')
-        if left_down(e) or left_up(e):
+        if left_down(e) or right_up(e) or boy.keep_run == -1:
             boy.action = 0
             boy.dir = -1
-        elif right_down(e) or right_up(e):
+        elif right_down(e) or left_up(e) or boy.keep_run == 1:
             boy.action = 1
             boy.dir = 1
+        boy.keep_run += boy.dir
         boy.frame = 0
     @staticmethod
     def exit(boy, e):
@@ -75,10 +86,16 @@ class AutoRun:
     def enter(boy,e):
         boy.start_time = get_time()
         print('Boy AutoRun Enter')
-        if left_down(e) or left_up(e) or boy.face_dir == -1:
+        if left_down(e) or right_up(e) or boy.face_dir == -1:
             boy.action = 0
             boy.dir = -1
-        elif right_down(e) or right_up(e) or boy.face_dir == 1:
+        elif right_down(e) or left_up(e) or boy.face_dir == 1:
+            boy.action = 1
+            boy.dir = 1
+        if boy.keep_run == -1:
+            boy.action = 0
+            boy.dir = -1
+        elif boy.keep_run == 1:
             boy.action = 1
             boy.dir = 1
         boy.frame = 0
@@ -94,7 +111,11 @@ class AutoRun:
             boy.x += boy.dir * 10
         boy.frame = (boy.frame + 1) % 8
         if get_time() - boy.start_time > 3:
-            boy.state_machine.add_event(('TIME_OUT', 0))
+            if boy.keep_run:
+                boy.dir = boy.keep_run
+                boy.state_machine.add_event(('KEEP_RUN', 0))
+            else:
+                boy.state_machine.add_event(('TIME_OUT', 0))
     @staticmethod
     def draw(boy):  # ''좌우 상하 반전 x 'v'좌우반전? 'h'상하반전?
         boy.image.clip_draw(boy.frame * 100, boy.action * 100, 100, 100, boy.x, boy.y + 15, 150, 150)
@@ -105,15 +126,16 @@ class Boy:
         self.frame = 0
         self.dir = 0
         self.action = 3
+        self.keep_run = 0
         self.image = load_image('animation_sheet.png')
         self.state_machine = StateMachine(self)
         self.state_machine.start(Idle)
         self.state_machine.set_transitions(
             {
-                Idle : { time_out : Sleep, right_down : Run, left_down : Run, a_down : AutoRun },
+                Idle : { time_out : Sleep, right_down : Run, left_down : Run, right_up : Run, left_up : Run, a_down : AutoRun, keep_run : Run },
                 Sleep: { space_down : Idle, right_down : Run, left_down : Run, a_down : AutoRun },
-                Run : { right_up : Idle, left_up : Idle, a_down : AutoRun },
-                AutoRun : { time_out : Idle, right_down : Run, left_down : Run }
+                Run : { right_down : Idle, left_down : Idle, right_up : Idle, left_up : Idle, a_down : AutoRun },
+                AutoRun : { right_down : Run, left_down : Run, right_up : Idle, left_up : Idle, keep_run : Run, time_out : Idle }
             }
         )
     def update(self):
@@ -122,7 +144,7 @@ class Boy:
     def handle_event(self, event):
         # event: 입력 이벤트 key mouse
         # 우리가 state machine 전달해줄껀 튜플
-        if event.type ==SDL_KEYDOWN or event.type == SDL_KEYUP:
+        if event.type == SDL_KEYDOWN or event.type == SDL_KEYUP:
             self.state_machine.add_event(('INPUT', event))
     def draw(self):
         self.state_machine.draw()

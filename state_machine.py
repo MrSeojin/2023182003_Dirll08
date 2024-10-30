@@ -27,6 +27,9 @@ def left_up(e):
 def a_down(e):
     return e[0] == 'INPUT' and e[1].key == 97
 
+def keep_run(e):
+    return e[0] == 'KEEP_RUN'
+
 class StateMachine:
     def __init__(self, obj):
         self.obj = obj
